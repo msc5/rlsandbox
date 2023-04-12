@@ -5,6 +5,7 @@ import torch
 from torch.optim import Adam
 import gym
 import time
+import robosuite
 
 from rich.console import Console
 
@@ -46,7 +47,7 @@ class ReplayBuffer:
 def sac(env_fn, actor_critic=core.MLPActorCritic, ac_kwargs=dict(), seed=0,
         steps_per_epoch=4000, epochs=100, replay_size=int(1e6), gamma=0.99,
         polyak=0.995, lr=1e-3, alpha=0.2, batch_size=100, start_steps=10000,
-        update_after=1000, update_every=50, num_test_episodes=10, max_ep_len=1000, save_freq=1):
+        update_after=1000, update_every=50, num_test_episodes=10, max_ep_len=1000, save_freq=1, render=True):
     """
     Soft Actor-Critic (SAC)
 
@@ -285,8 +286,9 @@ def sac(env_fn, actor_critic=core.MLPActorCritic, ac_kwargs=dict(), seed=0,
                 o, r, d, _ = test_env.step(get_action(o, True))
                 ep_ret += r
                 ep_len += 1
-                # frames += [test_env.render()]
-                # test_env.render()
+
+                if render:
+                    test_env.render()
 
             # # Make gif
             # file = f'episode_{j}'
@@ -322,7 +324,8 @@ def sac(env_fn, actor_critic=core.MLPActorCritic, ac_kwargs=dict(), seed=0,
         ep_ret += r
         ep_len += 1
 
-        # env.render()
+        if render:
+            env.render()
 
         # Ignore the "done" signal if it comes from hitting the time
         # horizon (that is, when it's an artificial terminal signal
@@ -378,6 +381,7 @@ def sac(env_fn, actor_critic=core.MLPActorCritic, ac_kwargs=dict(), seed=0,
 
 
 if __name__ == '__main__':
+
     import argparse
     parser = argparse.ArgumentParser()
     parser.add_argument('--env', type=str, default='HalfCheetah-v2')
@@ -387,10 +391,27 @@ if __name__ == '__main__':
     parser.add_argument('--seed', '-s', type=int, default=0)
     parser.add_argument('--epochs', type=int, default=50)
     parser.add_argument('--exp_name', type=str, default='sac')
+    parser.add_argument('--render', action='store_true', default=True)
     args = parser.parse_args()
 
     torch.set_num_threads(torch.get_num_threads())
 
-    sac(lambda: gym.make(args.env), actor_critic=core.MLPActorCritic,
+    from .robots.env import RobotEnv
+
+    def env_fn():
+        # return gym.make(name)
+        # create environment instance
+        # env = robosuite.make(
+        #     env_name="Lift",  # try with other tasks like "Stack" and "Door"
+        #     robots="Panda",  # try with other robots like "Sawyer" and "Jaco"
+        #     has_renderer=True,
+        #     has_offscreen_renderer=False,
+        #     use_camera_obs=False,
+        # )
+        env = RobotEnv()
+
+        return env
+
+    sac(env_fn, actor_critic=core.MLPActorCritic,
         ac_kwargs=dict(hidden_sizes=[args.hid] * args.l),
-        gamma=args.gamma, seed=args.seed, epochs=args.epochs)
+        gamma=args.gamma, seed=args.seed, epochs=args.epochs, render=args.render)
